@@ -22,7 +22,6 @@ interface N8NMessagePayload {
   "audio-base64"?: string;
 
   // Resposta da IA
-  ia?: boolean;
   message?: string;
   receptor?: string;
 
@@ -67,7 +66,7 @@ export async function POST(request: NextRequest) {
     console.log("Áudio base64 presente:", !!body["audio-base64"]);
 
     // 0. PROCESSAR RESPOSTA DA IA
-    if (body.ia && body.message && body.receptor) {
+    if (body.message && body.receptor) {
       console.log("Processando resposta da IA para:", body.receptor);
 
       // Validar se receptor é um número válido
