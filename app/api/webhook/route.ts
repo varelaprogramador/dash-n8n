@@ -4,23 +4,23 @@ import { prisma } from "@/lib/prisma";
 interface N8NMessagePayload {
   // Remetente (obrigatório em todos os tipos)
   sender: string; // Número do WhatsApp: ex: 554398414904@s.whatsapp.net
-  
+
   // Mensagem de texto
   mensagem?: string;
-  
+
   // Imagem
   "imagem-base64"?: string;
   "imagem-analisada"?: string;
-  
+
   // Documento
   "documento-base64"?: string;
   "documento-conteudo"?: string;
   mimetype?: string;
-  
+
   // Áudio
   "audio-transcrito"?: string;
   "audio-base64"?: string;
-  
+
   // Metadados opcionais
   messageId?: string;
   timestamp?: string;
@@ -31,8 +31,13 @@ interface N8NMessagePayload {
 export async function POST(request: NextRequest) {
   try {
     const body: N8NMessagePayload = await request.json();
-    
+
     console.log("Webhook recebido:", body);
+    console.log(
+      "Tipo de áudio detectado:",
+      body["audio-transcrito"] ? "com transcrição" : "sem transcrição"
+    );
+    console.log("Áudio base64 presente:", !!body["audio-base64"]);
 
     // Validar se sender foi enviado
     if (!body.sender) {
@@ -45,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Extrair e limpar o número do WhatsApp
     const cleanPhoneNumber = (sender: string): string => {
       // Remove @s.whatsapp.net e @g.us para extrair apenas o número
-      return sender.replace(/@(s\.whatsapp\.net|g\.us)$/, '');
+      return sender.replace(/@(s\.whatsapp\.net|g\.us)$/, "");
     };
 
     const sender = body.sender;
@@ -59,7 +64,7 @@ export async function POST(request: NextRequest) {
     // 1. MENSAGEM DE TEXTO
     if (body.mensagem && body.mensagem.trim()) {
       messageType = "texto";
-      
+
       const textMessage = await prisma.textMessage.create({
         data: {
           sender,
@@ -80,9 +85,10 @@ export async function POST(request: NextRequest) {
             minute: "2-digit",
           }),
           type: "texto",
-          message: body.mensagem.length > 100 
-            ? `${body.mensagem.substring(0, 100)}...` 
-            : body.mensagem,
+          message:
+            body.mensagem.length > 100
+              ? `${body.mensagem.substring(0, 100)}...`
+              : body.mensagem,
           response: "Recebida",
           sender,
         },
@@ -94,19 +100,23 @@ export async function POST(request: NextRequest) {
         message: body.mensagem,
       };
     }
-    
+
     // 2. MENSAGEM DE ÁUDIO
     else if (body["audio-base64"] || body["audio-transcrito"]) {
       messageType = "áudio";
-      
-      // Validar formato base64 se fornecido
-      const audioBase64 = body["audio-base64"];
-      if (audioBase64 && !audioBase64.match(/^data:audio\/[a-zA-Z0-9]+;base64,/)) {
-        return NextResponse.json(
-          { error: "Formato de áudio base64 inválido" },
-          { status: 400 }
-        );
+
+      // Processar áudio base64
+      let audioBase64 = body["audio-base64"];
+
+      // Se não tem prefixo data:, adicionar o prefixo padrão
+      if (audioBase64 && !audioBase64.startsWith("data:")) {
+        audioBase64 = `data:audio/ogg;base64,${audioBase64}`;
       }
+
+      console.log(
+        "Áudio base64 processado:",
+        audioBase64 ? "presente" : "ausente"
+      );
 
       const audioMessage = await prisma.audioMessage.create({
         data: {
@@ -129,8 +139,8 @@ export async function POST(request: NextRequest) {
             minute: "2-digit",
           }),
           type: "áudio",
-          message: body["audio-transcrito"] 
-            ? `🎤 ${body["audio-transcrito"]}` 
+          message: body["audio-transcrito"]
+            ? `🎤 ${body["audio-transcrito"]}`
             : "Mensagem de áudio recebida",
           response: "Recebida",
           sender,
@@ -147,7 +157,6 @@ export async function POST(request: NextRequest) {
             audioConverted: 1,
             responsesSent: 0,
             leadsAttended: 0,
-            automationRate: 0,
             uptime: 1,
             averageResponseTime: 1.2,
             lastUpdated: new Date(),
@@ -166,13 +175,16 @@ export async function POST(request: NextRequest) {
         hasAudio: !!audioBase64,
       };
     }
-    
+
     // 3. IMAGEM
     else if (body["imagem-base64"] || body["imagem-analisada"]) {
       messageType = "imagem";
-      
+
       const imageBase64 = body["imagem-base64"];
-      if (imageBase64 && !imageBase64.match(/^data:image\/[a-zA-Z0-9]+;base64,/)) {
+      if (
+        imageBase64 &&
+        !imageBase64.match(/^data:image\/[a-zA-Z0-9]+;base64,/)
+      ) {
         return NextResponse.json(
           { error: "Formato de imagem base64 inválido" },
           { status: 400 }
@@ -181,14 +193,18 @@ export async function POST(request: NextRequest) {
 
       // Calcular tamanho aproximado
       const base64Data = imageBase64 ? imageBase64.split(",")[1] : "";
-      const approximateSize = base64Data ? Math.floor((base64Data.length * 3) / 4) : 0;
+      const approximateSize = base64Data
+        ? Math.floor((base64Data.length * 3) / 4)
+        : 0;
 
       const mediaMessage = await prisma.mediaMessage.create({
         data: {
           sender,
           mediaBase64: imageBase64 || "",
           mediaType: "image",
-          mimeType: imageBase64 ? imageBase64.split(";")[0].split(":")[1] : "image/jpeg",
+          mimeType: imageBase64
+            ? imageBase64.split(";")[0].split(":")[1]
+            : "image/jpeg",
           fileName: `image_${Date.now()}.jpg`,
           fileSize: approximateSize,
           caption: body["imagem-analisada"] || null,
@@ -206,7 +222,11 @@ export async function POST(request: NextRequest) {
             minute: "2-digit",
           }),
           type: "image",
-          message: `🖼️ Imagem ${body["imagem-analisada"] ? `- ${body["imagem-analisada"]}` : "recebida"}`,
+          message: `🖼️ Imagem ${
+            body["imagem-analisada"]
+              ? `- ${body["imagem-analisada"]}`
+              : "recebida"
+          }`,
           response: "Recebida",
           sender,
         },
@@ -219,33 +239,40 @@ export async function POST(request: NextRequest) {
         hasImage: !!imageBase64,
       };
     }
-    
+
     // 4. DOCUMENTO
     else if (body["documento-base64"] || body["documento-conteudo"]) {
       messageType = "documento";
-      
+
       const documentBase64 = body["documento-base64"];
-      const mimeType = body.mimetype || 
-        (documentBase64 ? documentBase64.split(";")[0].split(":")[1] : "application/octet-stream");
-      
+      const mimeType =
+        body.mimetype ||
+        (documentBase64
+          ? documentBase64.split(";")[0].split(":")[1]
+          : "application/octet-stream");
+
       // Calcular tamanho aproximado
       const base64Data = documentBase64 ? documentBase64.split(",")[1] : "";
-      const approximateSize = base64Data ? Math.floor((base64Data.length * 3) / 4) : 0;
+      const approximateSize = base64Data
+        ? Math.floor((base64Data.length * 3) / 4)
+        : 0;
 
       // Gerar nome do arquivo baseado no mimetype
       const getFileExtension = (mimeType: string) => {
         const extensions: { [key: string]: string } = {
-          'application/pdf': 'pdf',
-          'application/msword': 'doc',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-          'application/vnd.ms-excel': 'xls',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
-          'text/plain': 'txt',
-          'application/zip': 'zip',
-          'application/json': 'json',
-          'text/csv': 'csv'
+          "application/pdf": "pdf",
+          "application/msword": "doc",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            "docx",
+          "application/vnd.ms-excel": "xls",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+            "xlsx",
+          "text/plain": "txt",
+          "application/zip": "zip",
+          "application/json": "json",
+          "text/csv": "csv",
         };
-        return extensions[mimeType] || 'bin';
+        return extensions[mimeType] || "bin";
       };
 
       const fileExtension = getFileExtension(mimeType);
@@ -274,7 +301,11 @@ export async function POST(request: NextRequest) {
             minute: "2-digit",
           }),
           type: "document",
-          message: `📄 ${fileName} ${body["documento-conteudo"] ? `- ${body["documento-conteudo"]}` : "recebido"}`,
+          message: `📄 ${fileName} ${
+            body["documento-conteudo"]
+              ? `- ${body["documento-conteudo"]}`
+              : "recebido"
+          }`,
           response: "Recebida",
           sender,
         },
@@ -290,7 +321,7 @@ export async function POST(request: NextRequest) {
         fileSize: approximateSize,
       };
     }
-    
+
     // 5. MENSAGEM VAZIA OU NÃO RECONHECIDA
     else {
       return NextResponse.json(
@@ -308,7 +339,6 @@ export async function POST(request: NextRequest) {
         audioConverted: 0,
         responsesSent: 0,
         leadsAttended: 1,
-        automationRate: 0.95,
         uptime: 1,
         averageResponseTime: 1.2,
         lastUpdated: new Date(),
@@ -321,11 +351,12 @@ export async function POST(request: NextRequest) {
 
     // Verificar se é um novo lead (primeira mensagem de qualquer tipo deste sender)
     const existingInteractions = await prisma.interaction.count({
-      where: { sender }
+      where: { sender },
     });
 
     let isNewLead = false;
-    if (existingInteractions === 1) { // A interação que acabamos de criar
+    if (existingInteractions === 1) {
+      // A interação que acabamos de criar
       // É um novo lead
       isNewLead = true;
       await prisma.botStats.update({
@@ -348,11 +379,18 @@ export async function POST(request: NextRequest) {
         messageId,
       },
     });
-
   } catch (error) {
     console.error("Erro no webhook:", error);
+    console.error(
+      "Stack trace:",
+      error instanceof Error ? error.stack : "No stack trace"
+    );
     return NextResponse.json(
-      { error: "Erro interno do servidor", details: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: "Erro interno do servidor",
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }
