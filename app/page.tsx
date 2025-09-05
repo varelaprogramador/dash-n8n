@@ -15,6 +15,9 @@ import {
   Zap,
   Image,
   FileText,
+  Calendar,
+  BarChart3,
+  Timer,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
@@ -26,9 +29,10 @@ interface BotStats {
   audioConverted: number
   responsesSent: number
   leadsAttended: number
-  automationRate: number
-  uptime: number
+  messagesPerDay: number
+  totalMediaMessages: number
   averageResponseTime: number
+  uptime: number
 }
 
 interface DailyMetric {
@@ -208,49 +212,6 @@ export default function BotDashboard() {
     },
   ]
 
-  const donutChartOptions = {
-    chart: {
-      type: "donut" as const,
-      height: 300,
-    },
-    colors: ["#3b82f6", "#ef4444"],
-    labels: ["Automatizadas", "Manuais"],
-    legend: {
-      position: "bottom" as const,
-      labels: {
-        colors: "#64748b",
-      },
-    },
-    plotOptions: {
-      pie: {
-        donut: {
-          size: "70%",
-          labels: {
-            show: true,
-            total: {
-              show: true,
-              label: "Total",
-              fontSize: "16px",
-              color: "#1f2937",
-              formatter: () => `${Math.round(botStats.automationRate * 100)}%`,
-            },
-            value: {
-              fontSize: "24px",
-              fontWeight: "bold",
-              color: "#1f2937",
-            },
-          },
-        },
-      },
-    },
-    tooltip: {
-      y: {
-        formatter: (val: number) => `${val}%`,
-      },
-    },
-  }
-
-  const donutChartSeries = [Math.round(botStats.automationRate * 100), Math.round((1 - botStats.automationRate) * 100)]
 
   const areaChartOptions = {
     chart: {
@@ -349,15 +310,15 @@ export default function BotDashboard() {
           <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white">
             <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white">Respostas Enviadas</CardTitle>
-              <Send className="h-6 w-6 text-white" />
+              <CardTitle className="text-sm font-medium text-white">Mensagens por Dia</CardTitle>
+              <Calendar className="h-6 w-6 text-white" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-white">{botStats.responsesSent.toLocaleString()}</div>
-              <p className="text-xs text-white mt-1">Quantas respostas automáticas o bot entregou</p>
+              <div className="text-3xl font-bold text-white">{botStats.messagesPerDay}</div>
+              <p className="text-xs text-white mt-1">Média de mensagens recebidas por dia</p>
               <div className="flex items-center mt-2">
-                <Zap className="w-4 h-4 mr-1 text-white" />
-                <p className="text-xs text-white">{Math.round(botStats.automationRate * 100)}% taxa de automação</p>
+                <BarChart3 className="w-4 h-4 mr-1 text-white" />
+                <p className="text-xs text-white">Baseado nos últimos 7 dias</p>
               </div>
             </CardContent>
           </Card>
@@ -365,15 +326,66 @@ export default function BotDashboard() {
           <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white">
             <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white">Leads Atendidos</CardTitle>
+              <CardTitle className="text-sm font-medium text-white">Tempo Médio</CardTitle>
+              <Timer className="h-6 w-6 text-white" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{botStats.averageResponseTime}s</div>
+              <p className="text-xs text-white mt-1">Tempo médio de processamento</p>
+              <div className="flex items-center mt-2">
+                <Zap className="w-4 h-4 mr-1 text-white" />
+                <p className="text-xs text-white">Performance otimizada</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Segunda linha de KPIs */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">Leads Únicos</CardTitle>
               <Users className="h-6 w-6 text-white" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-white">{botStats.leadsAttended}</div>
-              <p className="text-xs text-white mt-1">Novos contatos únicos atendidos pelo bot</p>
+              <p className="text-xs text-white mt-1">Contatos únicos que interagiram</p>
               <div className="flex items-center mt-2">
                 <TrendingUp className="w-4 h-4 mr-1 text-white" />
-                <p className="text-xs text-white">Contatos únicos</p>
+                <p className="text-xs text-white">Sem duplicatas</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-pink-500 to-pink-600 text-white">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">Mídias Recebidas</CardTitle>
+              <Image className="h-6 w-6 text-white" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{botStats.totalMediaMessages}</div>
+              <p className="text-xs text-white mt-1">Imagens e documentos enviados</p>
+              <div className="flex items-center mt-2">
+                <FileText className="w-4 h-4 mr-1 text-white" />
+                <p className="text-xs text-white">Fotos, PDFs, etc</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-teal-500 to-teal-600 text-white">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">Respostas Enviadas</CardTitle>
+              <Send className="h-6 w-6 text-white" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{botStats.responsesSent}</div>
+              <p className="text-xs text-white mt-1">Total de respostas processadas</p>
+              <div className="flex items-center mt-2">
+                <Activity className="w-4 h-4 mr-1 text-white" />
+                <p className="text-xs text-white">Automático + manual</p>
               </div>
             </CardContent>
           </Card>
@@ -394,13 +406,52 @@ export default function BotDashboard() {
 
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-xl font-bold text-gray-800">Taxa de Automação</CardTitle>
+              <CardTitle className="text-xl font-bold text-gray-800">Tipos de Mídia</CardTitle>
               <CardDescription className="text-gray-600">
-                Eficiência do bot: % de mensagens respondidas sem precisar da sua equipe.
+                Distribuição dos tipos de conteúdo recebidos dos clientes.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Chart options={donutChartOptions} series={donutChartSeries} type="donut" height={300} />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <MessageSquare className="w-8 h-8 text-blue-600" />
+                    <div>
+                      <h3 className="font-semibold text-gray-800">Mensagens de Texto</h3>
+                      <p className="text-sm text-gray-600">Conversas diretas</p>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {Math.round((botStats.totalMessages - botStats.audioConverted - botStats.totalMediaMessages) / botStats.totalMessages * 100) || 0}%
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Mic className="w-8 h-8 text-emerald-600" />
+                    <div>
+                      <h3 className="font-semibold text-gray-800">Mensagens de Áudio</h3>
+                      <p className="text-sm text-gray-600">Áudios transcritos</p>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-emerald-600">
+                    {Math.round(botStats.audioConverted / botStats.totalMessages * 100) || 0}%
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Image className="w-8 h-8 text-purple-600" />
+                    <div>
+                      <h3 className="font-semibold text-gray-800">Imagens e Documentos</h3>
+                      <p className="text-sm text-gray-600">Arquivos e fotos</p>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {Math.round(botStats.totalMediaMessages / botStats.totalMessages * 100) || 0}%
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

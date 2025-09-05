@@ -31,6 +31,25 @@ export async function GET() {
       const totalMessages = textCount + audioCount + mediaCount
       const leadsAttended = uniqueLeads.length
 
+      // Calcular mensagens por dia (média dos últimos 7 dias)
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      
+      const recentMessages = await Promise.all([
+        prisma.textMessage.count({
+          where: { receivedAt: { gte: sevenDaysAgo } }
+        }),
+        prisma.audioMessage.count({
+          where: { receivedAt: { gte: sevenDaysAgo } }
+        }),
+        prisma.mediaMessage.count({
+          where: { receivedAt: { gte: sevenDaysAgo } }
+        })
+      ])
+      
+      const messagesLast7Days = recentMessages[0] + recentMessages[1] + recentMessages[2]
+      const messagesPerDay = Math.round(messagesLast7Days / 7)
+
       botStats = await prisma.botStats.create({
         data: {
           id: "1",
@@ -38,9 +57,10 @@ export async function GET() {
           audioConverted: audioWithTranscription,
           responsesSent: 0, // Começar do zero, será incrementado conforme respostas reais
           leadsAttended,
-          automationRate: totalMessages > 0 ? 0.95 : 0,
-          uptime: 0.998,
+          messagesPerDay,
+          totalMediaMessages: mediaCount,
           averageResponseTime: 1.2,
+          uptime: 0.998,
           lastUpdated: new Date()
         }
       })
@@ -54,11 +74,32 @@ export async function GET() {
       }
     })
 
-    // Atualizar botStats com contagem real de leads
+    // Recalcular mensagens por dia em tempo real
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    
+    const [recentTextMessages, recentAudioMessages, recentMediaMessages] = await Promise.all([
+      prisma.textMessage.count({
+        where: { receivedAt: { gte: sevenDaysAgo } }
+      }),
+      prisma.audioMessage.count({
+        where: { receivedAt: { gte: sevenDaysAgo } }
+      }),
+      prisma.mediaMessage.count({
+        where: { receivedAt: { gte: sevenDaysAgo } }
+      })
+    ])
+    
+    const totalRecentMessages = recentTextMessages + recentAudioMessages + recentMediaMessages
+    const currentMessagesPerDay = Math.round(totalRecentMessages / 7)
+
+    // Atualizar botStats com contagem real
     await prisma.botStats.update({
       where: { id: "1" },
       data: {
         leadsAttended: currentUniqueLeads.length,
+        messagesPerDay: currentMessagesPerDay,
+        totalMediaMessages: recentMediaMessages,
         lastUpdated: new Date()
       }
     })
@@ -160,9 +201,10 @@ export async function GET() {
         audioConverted: botStats.audioConverted,
         responsesSent: botStats.responsesSent,
         leadsAttended: botStats.leadsAttended,
-        automationRate: botStats.automationRate,
-        uptime: botStats.uptime,
-        averageResponseTime: botStats.averageResponseTime
+        messagesPerDay: botStats.messagesPerDay,
+        totalMediaMessages: botStats.totalMediaMessages,
+        averageResponseTime: botStats.averageResponseTime,
+        uptime: botStats.uptime
       },
       dailyMetrics: dailyMetricsData,
       recentInteractions,

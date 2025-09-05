@@ -50,9 +50,10 @@ model BotStats {
   audioConverted      Int      @default(0)
   responsesSent       Int      @default(0)
   leadsAttended       Int      @default(0)
-  automationRate      Float    @default(0.92) // Taxa de automação (0-1)
-  uptime             Float    @default(0.998) // Uptime (0-1)
+  messagesPerDay      Int      @default(0)
+  totalMediaMessages  Int      @default(0)
   averageResponseTime Float    @default(1.2)   // em segundos
+  uptime             Float    @default(0.998) // Uptime (0-1)
   lastUpdated        DateTime @default(now())
   createdAt          DateTime @default(now())
 
