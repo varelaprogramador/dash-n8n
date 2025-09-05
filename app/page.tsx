@@ -18,6 +18,8 @@ import {
   Calendar,
   BarChart3,
   Timer,
+  RefreshCw,
+  Eye,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
@@ -68,6 +70,7 @@ export default function BotDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedMessage, setSelectedMessage] = useState<string | null>(null)
 
   // Função para buscar dados do dashboard
   const fetchDashboardData = async () => {
@@ -259,6 +262,17 @@ export default function BotDashboard() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              <button
+                onClick={() => {
+                  setLoading(true)
+                  fetchDashboardData()
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors duration-200 text-white border border-white/20"
+                title="Atualizar dados"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span className="text-sm font-medium">Atualizar</span>
+              </button>
               <Badge className={`px-4 py-2 ${systemHealth.status === "Ativo"
                 ? "bg-green-500/20 text-green-100 border-green-400"
                 : "bg-red-500/20 text-red-100 border-red-400"
@@ -491,29 +505,34 @@ export default function BotDashboard() {
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-2">
+                    <div className="flex-1 min-w-0 max-w-full">
+                      <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                        <div className="flex items-center space-x-2 flex-shrink-0">
                           <span className="text-sm font-semibold text-gray-800">{interaction.time}</span>
                           {interaction.sender && (
                             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                              {interaction.sender.replace(/@.*$/, '')}
+                              {interaction.sender.replace(/@.*$/, '').slice(0, 8)}...
                             </span>
                           )}
                         </div>
                         <Badge
                           variant="outline"
-                          className={`text-xs ${interaction.status === "Respondida"
+                          className={`text-xs flex-shrink-0 ${interaction.status === "Respondida"
                             ? "bg-green-50 text-green-700 border-green-200"
                             : interaction.status === "Enviada"
                               ? "bg-blue-50 text-blue-700 border-blue-200"
                               : "bg-yellow-50 text-yellow-700 border-yellow-200"
                             }`}
                         >
-                          {interaction.status || interaction.response}
+                          {interaction.status || interaction.response.length > 80 ? `${interaction.response.substring(0, 80)}...` : interaction.response}
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600 truncate">{interaction.message}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-gray-600 truncate flex-1 pr-2">
+                          {interaction.message.length > 80 ? `${interaction.message.substring(0, 80)}...` : interaction.message}
+                        </p>
+
+                      </div>
                     </div>
                   </div>
                 ))}

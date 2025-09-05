@@ -1,0 +1,29 @@
+        {/* Modal para ver mensagem completa */}
+        {selectedMessage && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedMessage(null)}>
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">Mensagem Completa</h3>
+                  <button
+                    onClick={() => setSelectedMessage(null)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{selectedMessage}</p>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={() => setSelectedMessage(null)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
