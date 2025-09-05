@@ -21,6 +21,11 @@ interface N8NMessagePayload {
   "audio-transcrito"?: string;
   "audio-base64"?: string;
 
+  // Resposta da IA
+  ia?: boolean;
+  message?: string;
+  receptor?: string;
+
   // Metadados opcionais
   messageId?: string;
   timestamp?: string;
@@ -38,6 +43,66 @@ export async function POST(request: NextRequest) {
       body["audio-transcrito"] ? "com transcrição" : "sem transcrição"
     );
     console.log("Áudio base64 presente:", !!body["audio-base64"]);
+
+    // 0. PROCESSAR RESPOSTA DA IA
+    if (body.ia && body.message && body.receptor) {
+      console.log("Processando resposta da IA para:", body.receptor);
+
+      // Marcar a última interação do receptor como respondida
+      const lastInteraction = await prisma.interaction.findFirst({
+        where: {
+          sender: body.receptor.includes("@")
+            ? body.receptor
+            : `${body.receptor}@s.whatsapp.net`,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (lastInteraction) {
+        await prisma.interaction.update({
+          where: { id: lastInteraction.id },
+          data: {
+            status: "Respondida",
+            response: body.message,
+          },
+        });
+        console.log(
+          "Última interação marcada como respondida:",
+          lastInteraction.id
+        );
+      }
+
+      // Incrementar contador de respostas enviadas
+      await prisma.botStats.upsert({
+        where: { id: "1" },
+        create: {
+          id: "1",
+          totalMessages: 0,
+          audioConverted: 0,
+          responsesSent: 1,
+          leadsAttended: 0,
+          uptime: 1,
+          averageResponseTime: 1.2,
+          lastUpdated: new Date(),
+        },
+        update: {
+          responsesSent: { increment: 1 },
+          lastUpdated: new Date(),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Resposta da IA processada com sucesso",
+        data: {
+          type: "ai_response",
+          receptor: body.receptor,
+          message: body.message,
+          interactionUpdated: !!lastInteraction,
+          interactionId: lastInteraction?.id,
+        },
+      });
+    }
 
     // Validar se sender foi enviado
     if (!body.sender) {

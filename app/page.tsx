@@ -47,6 +47,7 @@ interface Interaction {
   message: string
   response: string
   sender?: string
+  status?: string
 }
 
 interface SystemHealth {
@@ -116,7 +117,7 @@ export default function BotDashboard() {
         <div className="text-center">
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
           <p className="text-red-600 mb-4">{error}</p>
-          <button 
+          <button
             onClick={fetchDashboardData}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
@@ -136,15 +137,15 @@ export default function BotDashboard() {
     const date = new Date(lastExecution)
     const now = new Date()
     const diff = Math.floor((now.getTime() - date.getTime()) / 1000 / 60) // minutos
-    
+
     if (diff < 1) return "Agora"
     if (diff === 1) return "Há 1 minuto"
     if (diff < 60) return `Há ${diff} minutos`
-    
+
     const hours = Math.floor(diff / 60)
     if (hours === 1) return "Há 1 hora"
     if (hours < 24) return `Há ${hours} horas`
-    
+
     const days = Math.floor(hours / 24)
     if (days === 1) return "Há 1 dia"
     return `Há ${days} dias`
@@ -258,11 +259,10 @@ export default function BotDashboard() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              <Badge className={`px-4 py-2 ${
-                systemHealth.status === "Ativo" 
-                  ? "bg-green-500/20 text-green-100 border-green-400" 
-                  : "bg-red-500/20 text-red-100 border-red-400"
-              }`}>
+              <Badge className={`px-4 py-2 ${systemHealth.status === "Ativo"
+                ? "bg-green-500/20 text-green-100 border-green-400"
+                : "bg-red-500/20 text-red-100 border-red-400"
+                }`}>
                 <CheckCircle className="w-5 h-5 mr-2" />
                 {systemHealth.status}
               </Badge>
@@ -425,7 +425,7 @@ export default function BotDashboard() {
                     {Math.round((botStats.totalMessages - botStats.audioConverted - botStats.totalMediaMessages) / botStats.totalMessages * 100) || 0}%
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <Mic className="w-8 h-8 text-emerald-600" />
@@ -438,7 +438,7 @@ export default function BotDashboard() {
                     {Math.round(botStats.audioConverted / botStats.totalMessages * 100) || 0}%
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <Image className="w-8 h-8 text-purple-600" />
@@ -501,8 +501,16 @@ export default function BotDashboard() {
                             </span>
                           )}
                         </div>
-                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                          {interaction.response}
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${interaction.status === "Respondida"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : interaction.status === "Enviada"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                            }`}
+                        >
+                          {interaction.status || interaction.response}
                         </Badge>
                       </div>
                       <p className="text-sm text-gray-600 truncate">{interaction.message}</p>
@@ -515,60 +523,116 @@ export default function BotDashboard() {
 
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-xl font-bold text-gray-800">Saúde do Sistema</CardTitle>
+              <CardTitle className="text-xl font-bold text-gray-800">Análise de Performance</CardTitle>
               <CardDescription className="text-gray-600">
-                Se houver falhas, este painel mostrará imediatamente.
+                Métricas baseadas nos dados reais do sistema
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-100">
-                <Chart options={areaChartOptions} series={areaChartSeries} type="area" height={120} />
+              {/* Gráfico de distribuição de tipos de mensagem */}
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Distribuição de Tipos de Mensagem</h4>
+                <Chart
+                  options={{
+                    chart: { type: 'donut', height: 200 },
+                    labels: ['Texto', 'Áudio', 'Imagem', 'Documento'],
+                    colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'],
+                    legend: { position: 'bottom' },
+                    plotOptions: {
+                      pie: {
+                        donut: {
+                          size: '60%'
+                        }
+                      }
+                    }
+                  }}
+                  series={[
+                    recentInteractions.filter((i: Interaction) => i.type === 'texto').length,
+                    recentInteractions.filter((i: Interaction) => i.type === 'áudio').length,
+                    recentInteractions.filter((i: Interaction) => i.type === 'image').length,
+                    recentInteractions.filter((i: Interaction) => i.type === 'document').length
+                  ]}
+                  type="donut"
+                  height={200}
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* KPIs principais */}
+              <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-blue-50 rounded-xl">
-                  <div className="text-2xl font-bold text-blue-600">{botStats.averageResponseTime}s</div>
-                  <div className="text-sm text-blue-700">Tempo Médio de Resposta</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {botStats.audioConverted > 0 ? ((botStats.audioConverted / botStats.totalMessages) * 100).toFixed(1) : 0}%
+                  </div>
+                  <div className="text-sm text-blue-700">Taxa de Conversão de Áudio</div>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-xl">
-                  <div className="text-2xl font-bold text-green-600">{(botStats.uptime * 100).toFixed(1)}%</div>
-                  <div className="text-sm text-green-700">Uptime (últimas 24h)</div>
+                  <div className="text-2xl font-bold text-green-600">{botStats.averageResponseTime}s</div>
+                  <div className="text-sm text-green-700">Tempo Médio de Resposta</div>
+                </div>
+                <div className="text-center p-4 bg-purple-50 rounded-xl">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {recentInteractions.length > 0 ? ((recentInteractions.filter(i => i.status === "Respondida").length / recentInteractions.length) * 100).toFixed(1) : 0}%
+                  </div>
+                  <div className="text-sm text-purple-700">Taxa de Resposta</div>
                 </div>
               </div>
 
+              {/* Métricas de engajamento */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <Activity className={`w-5 h-5 ${systemHealth.status === "Ativo" ? "text-green-500" : "text-red-500"}`} />
-                    <span className="font-medium text-gray-800">Status do Fluxo</span>
+                    <MessageSquare className="w-5 h-5 text-blue-500" />
+                    <span className="font-medium text-gray-800">Total de Interações</span>
                   </div>
-                  <Badge className={`${
-                    systemHealth.status === "Ativo" 
-                      ? "bg-green-100 text-green-800 border-green-200" 
-                      : "bg-red-100 text-red-800 border-red-200"
-                  }`}>
-                    {systemHealth.status}
+                  <span className="text-lg font-bold text-gray-800">{recentInteractions.length}</span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Users className="w-5 h-5 text-green-500" />
+                    <span className="font-medium text-gray-800">Leads Únicos Atendidos</span>
+                  </div>
+                  <span className="text-lg font-bold text-green-600">{botStats.leadsAttended}</span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Mic className="w-5 h-5 text-purple-500" />
+                    <span className="font-medium text-gray-800">Áudios Convertidos</span>
+                  </div>
+                  <span className="text-lg font-bold text-purple-600">{botStats.audioConverted}</span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Image className="w-5 h-5 text-orange-500" />
+                    <span className="font-medium text-gray-800">Mídias Processadas</span>
+                  </div>
+                  <span className="text-lg font-bold text-orange-600">{botStats.totalMediaMessages}</span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Send className="w-5 h-5 text-purple-500" />
+                    <span className="font-medium text-gray-800">Respostas Enviadas</span>
+                  </div>
+                  <span className="text-lg font-bold text-purple-600">{botStats.responsesSent}</span>
+                </div>
+              </div>
+
+              {/* Status do sistema */}
+              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Activity className="w-5 h-5 text-green-500" />
+                    <span className="font-medium text-gray-800">Status do Sistema</span>
+                  </div>
+                  <Badge className="bg-green-100 text-green-800 border-green-200">
+                    Ativo
                   </Badge>
                 </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Clock className="w-5 h-5 text-blue-500" />
-                    <span className="font-medium text-gray-800">Última Execução Bem-sucedida</span>
-                  </div>
-                  <span className="text-sm text-gray-600 font-medium">
-                    {formatLastExecution(systemHealth.lastExecution)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <AlertCircle className={`w-5 h-5 ${systemHealth.failuresLast24h > 0 ? "text-red-500" : "text-yellow-500"}`} />
-                    <span className="font-medium text-gray-800">Falhas Registradas</span>
-                  </div>
-                  <span className={`text-sm font-medium ${systemHealth.failuresLast24h > 0 ? "text-red-600" : "text-green-600"}`}>
-                    {systemHealth.failuresLast24h} nas últimas 24h
-                  </span>
+                <div className="mt-2 text-sm text-gray-600">
+                  Última atualização: {new Date().toLocaleString('pt-BR')}
                 </div>
               </div>
             </CardContent>
