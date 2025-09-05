@@ -35,7 +35,29 @@ interface N8NMessagePayload {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: N8NMessagePayload = await request.json();
+    // Verificar se o corpo da requisição é válido
+    const contentType = request.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      return NextResponse.json(
+        { error: "Content-Type deve ser application/json" },
+        { status: 400 }
+      );
+    }
+
+    let body: N8NMessagePayload;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      console.error("Erro ao fazer parse do JSON:", jsonError);
+      return NextResponse.json(
+        {
+          error: "JSON inválido fornecido",
+          details:
+            jsonError instanceof Error ? jsonError.message : "Unknown error",
+        },
+        { status: 400 }
+      );
+    }
 
     console.log("Webhook recebido:", body);
     console.log(
@@ -47,6 +69,22 @@ export async function POST(request: NextRequest) {
     // 0. PROCESSAR RESPOSTA DA IA
     if (body.ia && body.message && body.receptor) {
       console.log("Processando resposta da IA para:", body.receptor);
+
+      // Validar se receptor é um número válido
+      if (!body.receptor || typeof body.receptor !== "string") {
+        return NextResponse.json(
+          { error: "Campo 'receptor' é obrigatório e deve ser uma string" },
+          { status: 400 }
+        );
+      }
+
+      // Validar se message é uma string válida
+      if (!body.message || typeof body.message !== "string") {
+        return NextResponse.json(
+          { error: "Campo 'message' é obrigatório e deve ser uma string" },
+          { status: 400 }
+        );
+      }
 
       // Marcar a última interação do receptor como respondida
       const lastInteraction = await prisma.interaction.findFirst({
