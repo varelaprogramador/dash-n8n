@@ -13,6 +13,8 @@ import {
   Clock,
   TrendingUp,
   Zap,
+  Image,
+  FileText,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
@@ -40,6 +42,7 @@ interface Interaction {
   type: string
   message: string
   response: string
+  sender?: string
 }
 
 interface SystemHealth {
@@ -423,6 +426,14 @@ export default function BotDashboard() {
                         <div className="p-2 bg-emerald-100 rounded-lg">
                           <Mic className="w-4 h-4 text-emerald-600" />
                         </div>
+                      ) : interaction.type === "image" ? (
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                          <Image className="w-4 h-4 text-purple-600" />
+                        </div>
+                      ) : interaction.type === "document" ? (
+                        <div className="p-2 bg-orange-100 rounded-lg">
+                          <FileText className="w-4 h-4 text-orange-600" />
+                        </div>
                       ) : (
                         <div className="p-2 bg-blue-100 rounded-lg">
                           <MessageSquare className="w-4 h-4 text-blue-600" />
@@ -431,7 +442,14 @@ export default function BotDashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-semibold text-gray-800">{interaction.time}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-semibold text-gray-800">{interaction.time}</span>
+                          {interaction.sender && (
+                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                              {interaction.sender.replace(/@.*$/, '')}
+                            </span>
+                          )}
+                        </div>
                         <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
                           {interaction.response}
                         </Badge>

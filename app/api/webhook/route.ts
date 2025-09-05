@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 interface N8NMessagePayload {
+  // Remetente (obrigatório em todos os tipos)
+  sender: string; // Número do WhatsApp: ex: 554398414904@s.whatsapp.net
+  
   // Mensagem de texto
   mensagem?: string;
   
@@ -12,13 +15,13 @@ interface N8NMessagePayload {
   // Documento
   "documento-base64"?: string;
   "documento-conteudo"?: string;
+  mimetype?: string;
   
   // Áudio
   "audio-transcrito"?: string;
   "audio-base64"?: string;
   
   // Metadados opcionais
-  sender?: string;
   messageId?: string;
   timestamp?: string;
   isGroup?: boolean;
@@ -31,8 +34,22 @@ export async function POST(request: NextRequest) {
     
     console.log("Webhook recebido:", body);
 
-    // Extrair sender do cabeçalho ou body
-    const sender = body.sender || request.headers.get('x-sender') || 'unknown';
+    // Validar se sender foi enviado
+    if (!body.sender) {
+      return NextResponse.json(
+        { error: "Campo 'sender' é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    // Extrair e limpar o número do WhatsApp
+    const cleanPhoneNumber = (sender: string): string => {
+      // Remove @s.whatsapp.net e @g.us para extrair apenas o número
+      return sender.replace(/@(s\.whatsapp\.net|g\.us)$/, '');
+    };
+
+    const sender = body.sender;
+    const cleanedSender = cleanPhoneNumber(sender);
     const messageId = body.messageId || `msg_${Date.now()}`;
     const timestamp = body.timestamp ? new Date(body.timestamp) : new Date();
 
@@ -208,20 +225,39 @@ export async function POST(request: NextRequest) {
       messageType = "documento";
       
       const documentBase64 = body["documento-base64"];
+      const mimeType = body.mimetype || 
+        (documentBase64 ? documentBase64.split(";")[0].split(":")[1] : "application/octet-stream");
       
       // Calcular tamanho aproximado
       const base64Data = documentBase64 ? documentBase64.split(",")[1] : "";
       const approximateSize = base64Data ? Math.floor((base64Data.length * 3) / 4) : 0;
+
+      // Gerar nome do arquivo baseado no mimetype
+      const getFileExtension = (mimeType: string) => {
+        const extensions: { [key: string]: string } = {
+          'application/pdf': 'pdf',
+          'application/msword': 'doc',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+          'application/vnd.ms-excel': 'xls',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+          'text/plain': 'txt',
+          'application/zip': 'zip',
+          'application/json': 'json',
+          'text/csv': 'csv'
+        };
+        return extensions[mimeType] || 'bin';
+      };
+
+      const fileExtension = getFileExtension(mimeType);
+      const fileName = `document_${Date.now()}.${fileExtension}`;
 
       const mediaMessage = await prisma.mediaMessage.create({
         data: {
           sender,
           mediaBase64: documentBase64 || "",
           mediaType: "document",
-          mimeType: documentBase64 
-            ? documentBase64.split(";")[0].split(":")[1] 
-            : "application/octet-stream",
-          fileName: `document_${Date.now()}`,
+          mimeType,
+          fileName,
           fileSize: approximateSize,
           caption: body["documento-conteudo"] || null,
           messageId,
@@ -238,7 +274,7 @@ export async function POST(request: NextRequest) {
             minute: "2-digit",
           }),
           type: "document",
-          message: `📄 Documento ${body["documento-conteudo"] ? `- ${body["documento-conteudo"]}` : "recebido"}`,
+          message: `📄 ${fileName} ${body["documento-conteudo"] ? `- ${body["documento-conteudo"]}` : "recebido"}`,
           response: "Recebida",
           sender,
         },
@@ -247,8 +283,11 @@ export async function POST(request: NextRequest) {
       result = {
         type: "document",
         id: mediaMessage.id,
+        fileName,
+        mimeType,
         content: body["documento-conteudo"],
         hasDocument: !!documentBase64,
+        fileSize: approximateSize,
       };
     }
     
@@ -280,16 +319,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Verificar se é um novo lead (checkar todas as tabelas)
-    const [textCount, audioCount, mediaCount] = await Promise.all([
-      prisma.textMessage.count({ where: { sender } }),
-      prisma.audioMessage.count({ where: { sender } }),
-      prisma.mediaMessage.count({ where: { sender } }),
-    ]);
+    // Verificar se é um novo lead (primeira mensagem de qualquer tipo deste sender)
+    const existingInteractions = await prisma.interaction.count({
+      where: { sender }
+    });
 
-    const totalMessages = textCount + audioCount + mediaCount;
-    if (totalMessages === 1) {
+    let isNewLead = false;
+    if (existingInteractions === 1) { // A interação que acabamos de criar
       // É um novo lead
+      isNewLead = true;
       await prisma.botStats.update({
         where: { id: "1" },
         data: {
@@ -303,9 +341,10 @@ export async function POST(request: NextRequest) {
       message: `Mensagem de ${messageType} processada com sucesso`,
       data: {
         ...result,
-        sender,
+        sender: sender, // Formato completo: 554398414904@s.whatsapp.net
+        phoneNumber: cleanedSender, // Apenas o número: 554398414904
         receivedAt: timestamp,
-        isNewLead: totalMessages === 1,
+        isNewLead: isNewLead,
         messageId,
       },
     });

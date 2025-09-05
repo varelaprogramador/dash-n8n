@@ -20,34 +20,53 @@ export async function GET() {
         where: { transcription: { not: null } }
       })
 
-      // Contar leads únicos (senders únicos)
-      const uniqueSenders = await prisma.$queryRaw`
-        SELECT COUNT(DISTINCT sender) as count FROM (
-          SELECT sender FROM text_messages
-          UNION
-          SELECT sender FROM audio_messages  
-          UNION
-          SELECT sender FROM media_messages
-        ) as all_senders
-      ` as Array<{ count: BigInt }>
+      // Contar leads únicos usando tabela de interações (mais preciso)
+      const uniqueLeads = await prisma.interaction.groupBy({
+        by: ['sender'],
+        where: {
+          sender: { not: null }
+        }
+      })
 
       const totalMessages = textCount + audioCount + mediaCount
-      const leadsAttended = Number(uniqueSenders[0]?.count || 0)
+      const leadsAttended = uniqueLeads.length
 
       botStats = await prisma.botStats.create({
         data: {
           id: "1",
           totalMessages,
           audioConverted: audioWithTranscription,
-          responsesSent: Math.floor(totalMessages * 0.95), // Assumir 95% de automação
+          responsesSent: 0, // Começar do zero, será incrementado conforme respostas reais
           leadsAttended,
-          automationRate: 0.95,
+          automationRate: totalMessages > 0 ? 0.95 : 0,
           uptime: 0.998,
           averageResponseTime: 1.2,
           lastUpdated: new Date()
         }
       })
     }
+
+    // Recalcular leads únicos em tempo real para garantir precisão
+    const currentUniqueLeads = await prisma.interaction.groupBy({
+      by: ['sender'],
+      where: {
+        sender: { not: null }
+      }
+    })
+
+    // Atualizar botStats com contagem real de leads
+    await prisma.botStats.update({
+      where: { id: "1" },
+      data: {
+        leadsAttended: currentUniqueLeads.length,
+        lastUpdated: new Date()
+      }
+    })
+
+    // Buscar stats atualizados
+    botStats = await prisma.botStats.findFirst({
+      where: { id: "1" }
+    })
 
     // 2. Calcular métricas diárias dos últimos 7 dias
     const last7Days = Array.from({ length: 7 }, (_, i) => {
