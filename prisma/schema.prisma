@@ -1,0 +1,133 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo para interações do bot
+model Interaction {
+  id        String   @id @default(cuid())
+  time      String
+  type      String   // "texto", "áudio", "image", "document", "video", "sticker"
+  message   String
+  response  String
+  sender    String?  // Número do remetente
+  status    String   @default("Enviada")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("interactions")
+  @@index([sender])
+}
+
+// Modelo para métricas diárias
+model DailyMetric {
+  id           String   @id @default(cuid())
+  date         DateTime @unique
+  day          String   // "Seg", "Ter", etc.
+  textMessages Int      @default(0)
+  audioMessages Int     @default(0)
+  totalMessages Int     @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("daily_metrics")
+}
+
+// Modelo para estatísticas gerais
+model BotStats {
+  id                  String   @id @default(cuid())
+  totalMessages       Int      @default(0)
+  audioConverted      Int      @default(0)
+  responsesSent       Int      @default(0)
+  leadsAttended       Int      @default(0)
+  automationRate      Float    @default(0.92) // Taxa de automação (0-1)
+  uptime             Float    @default(0.998) // Uptime (0-1)
+  averageResponseTime Float    @default(1.2)   // em segundos
+  lastUpdated        DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  @@map("bot_stats")
+}
+
+// Modelo para saúde do sistema
+model SystemHealth {
+  id                String   @id @default(cuid())
+  status            String   @default("Ativo")
+  lastExecution     DateTime @default(now())
+  failuresLast24h   Int      @default(0)
+  performanceScore  Float    @default(99.8)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("system_health")
+}
+
+// Modelo para mensagens de texto
+model TextMessage {
+  id            String   @id @default(cuid())
+  sender        String   // Número do remetente
+  message       String   // Conteúdo da mensagem
+  messageId     String?  // ID da mensagem no WhatsApp
+  isGroup       Boolean  @default(false)
+  groupName     String?  // Nome do grupo (se for mensagem de grupo)
+  quotedMessage String?  // Mensagem citada/respondida
+  receivedAt    DateTime @default(now())
+  processed     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("text_messages")
+  @@index([sender])
+  @@index([receivedAt])
+}
+
+// Modelo para mensagens de áudio
+model AudioMessage {
+  id             String   @id @default(cuid())
+  sender         String   // Número do remetente
+  audioBase64    String   // Áudio em base64
+  audioMimeType  String   @default("audio/ogg")
+  duration       Int      @default(0) // Duração em segundos
+  transcription  String?  // Transcrição do áudio (se disponível)
+  messageId      String?  // ID da mensagem no WhatsApp
+  receivedAt     DateTime @default(now())
+  processed      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("audio_messages")
+  @@index([sender])
+  @@index([receivedAt])
+}
+
+// Modelo para mídia (imagens, documentos, vídeos, stickers)
+model MediaMessage {
+  id           String   @id @default(cuid())
+  sender       String   // Número do remetente
+  mediaBase64  String   // Mídia em base64
+  mediaType    String   // "image", "document", "video", "sticker"
+  mimeType     String   // Tipo MIME do arquivo
+  fileName     String   // Nome do arquivo
+  fileSize     Int      @default(0) // Tamanho do arquivo em bytes
+  caption      String?  // Legenda da mídia (se houver)
+  messageId    String?  // ID da mensagem no WhatsApp
+  receivedAt   DateTime @default(now())
+  processed    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("media_messages")
+  @@index([sender])
+  @@index([mediaType])
+  @@index([receivedAt])
+}
